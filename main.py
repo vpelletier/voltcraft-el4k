@@ -179,6 +179,8 @@ def main():
         action='append', default=[], type=parseTime)
     parser.add_argument('--price2', help=PROCE_HELP_TEMPLATE % 2,
         action='append', default=[], type=parseTime)
+    parser.add_argument('--text', action='store_true', help='Display text '
+        'dump independently of matplotlib availability')
     parser.add_argument('file_list', metavar='file', nargs='+')
     args = parser.parse_args()
     price1_range_list = getPrice1RangeList(args.price1, args.price2)
@@ -191,7 +193,7 @@ def main():
         with open(filename) as infile:
             data = infile.read()
         sensor_dict[sensor_id].accumulate(data)
-    if plt is None:
+    if args.text or plt is None:
         for sensor_id, data in sensor_dict.iteritems():
             assert sensor_id == data.sensor_id, (sensor_id, data.sensor_id)
             print 'sensor', data.sensor_id, 'recorded=%s on=%s price1=%.3f ' \
