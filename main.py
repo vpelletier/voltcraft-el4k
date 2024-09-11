@@ -1,10 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import collections
 import struct
 import os
 import sys
 import datetime
-from cStringIO import StringIO
+from io import BytesIO
 import operator
 import argparse
 try:
@@ -22,11 +22,11 @@ def Bcd(data):
     """
     result = 0
     for char in data:
-        result = result * 10 + ord(char)
+        result = result * 10 + char
     return result
 
 def int3(data):
-    return struct.unpack('>I', '\x00' + data)[0]
+    return struct.unpack('>I', b'\x00' + data)[0]
 
 def dailyDuration(data):
     #hour, minute = divmod(struct.unpack('>H', data)[0], 100)
@@ -36,7 +36,7 @@ def dailyDuration(data):
 TIMEDELTA = datetime.timedelta(0, 60)
 # First possible time. Used as a None replacement for sorting purpose.
 EARLIEST_TIME = datetime.datetime(2000, 1, 1)
-FIRST_SENSOR_ID_FILENAME_PREFIX = ord('A')
+FIRST_SENSOR_ID_FILENAME_PREFIX = 'A'.encode('ascii')[0]
 
 class Data(object):
     """
@@ -78,38 +78,38 @@ class Data(object):
         self.daily_total = []
 
     def accumulate(self, data):
-        if data[:5] == 'INFO:':
+        if data[:5] == b'INFO:':
             assert self.power is None
-            read = StringIO(data[5:]).read
+            read = BytesIO(data[5:]).read
             self.power = int3(read(3)) / 1000.
             self.recorded = int3(read(3)) / 100.
             self.on = int3(read(3)) / 100.
             daily_total = self.daily_total
-            for _ in xrange(10):
+            for _ in range(10):
                 daily_total.append([int3(read(3)) / 1000.])
-            for i in xrange(10):
+            for i in range(10):
                 daily_total[i].append(dailyDuration(read(2)))
-            for i in xrange(10):
+            for i in range(10):
                 daily_total[i].append(dailyDuration(read(2)))
-            self.sensor_id = ord(read(1))
+            self.sensor_id = read(1)[0]
             self.price1 = Bcd(read(4)) / 1000.
             self.price2 = Bcd(read(4)) / 1000.
             hour, minute, month, day, year = struct.unpack('BBBBB', read(5))
             self.since = datetime.datetime(2000 + year, month, day, hour,
                 minute)
             tail = read()
-            assert tail == '\xff\xff\xff\xff', tail
+            assert tail == b'\xff\xff\xff\xff', tail
         else:
-            read = StringIO(data).read
+            read = BytesIO(data).read
             date = None
             while True:
                 chunk = read(3)
-                if chunk == '\xe0\xc5\xea':
+                if chunk == b'\xe0\xc5\xea':
                     month, day, year, hour, minute = struct.unpack('BBBBB',
                         read(5))
                     date = datetime.datetime(2000 + year, month, day, hour,
                         minute)
-                elif chunk == '\xff\xff\xff':
+                elif chunk == b'\xff\xff\xff':
                     break
                 else:
                     voltage, current, power_factor = struct.unpack('>HHB',
@@ -190,23 +190,23 @@ def main():
         sensor_id = ord(basename(filename)[0].upper()) - \
             FIRST_SENSOR_ID_FILENAME_PREFIX
         assert 0 <= sensor_id <= 9, sensor_id
-        with open(filename) as infile:
+        with open(filename, 'rb') as infile:
             data = infile.read()
         sensor_dict[sensor_id].accumulate(data)
     if args.text or plt is None:
-        for sensor_id, data in sensor_dict.iteritems():
+        for sensor_id, data in sensor_dict.items():
             assert sensor_id == data.sensor_id, (sensor_id, data.sensor_id)
-            print 'sensor', data.sensor_id, 'recorded=%s on=%s price1=%.3f ' \
-                'price2=%.3f' % (data.recorded, data.on, data.price1, data.price2)
+            print('sensor', data.sensor_id, 'recorded=%s on=%s price1=%.3f ' \
+                'price2=%.3f' % (data.recorded, data.on, data.price1, data.price2))
             for day, (power, recorded, on) in enumerate(data.daily_total):
-                print 'day-%i: %.3fkWh %s %s' % (day, power, recorded, on)
-            print 'Total: %.3fkWh' % data.power
+                print('day-%i: %.3fkWh %s %s' % (day, power, recorded, on))
+            print('Total: %.3fkWh' % data.power)
             for date, voltage, current, power_factor in data.record_list:
                 voltamperes = voltage * current
-                print ' %s  %5.01fV %7.03fA %.02fcosPhi %8.2fW %8.2fVA' % (
+                print(' %s  %5.01fV %7.03fA %.02fcosPhi %8.2fW %8.2fVA' % (
                     date, voltage, current, power_factor,
                     voltamperes * power_factor, voltamperes
-                )
+                ))
     else:
         # XXX: looks bad on low resolutions (proportional margins around
         # non-proportional data...)
@@ -214,7 +214,7 @@ def main():
         all_days = DayLocator()
         all_hours = HourLocator()
         day_formatter = DateFormatter('%Y-%m-%d')
-        for sensor_id, data in sensor_dict.iteritems():
+        for sensor_id, data in sensor_dict.items():
             date_list = [x[0] for x in data.record_list]
             price_list = []
             for date in date_list:
@@ -234,7 +234,7 @@ def main():
             expanded_price1_range_list = []
             append = expanded_price1_range_list.append
             first_day = date_list[0].date()
-            for day in xrange((date_list[-1].date() - first_day).days + 1):
+            for day in range((date_list[-1].date() - first_day).days + 1):
                 day = first_day + datetime.timedelta(day)
                 for start, stop in price1_range_list:
                     append((
