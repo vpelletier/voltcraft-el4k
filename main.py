@@ -211,9 +211,6 @@ def main():
         # XXX: looks bad on low resolutions (proportional margins around
         # non-proportional data...)
         cols = len(sensor_dict)
-        all_days = DayLocator()
-        all_hours = HourLocator()
-        day_formatter = DateFormatter('%Y-%m-%d')
         for sensor_id, data in sensor_dict.items():
             date_list = [x[0] for x in data.record_list]
             price_list = []
@@ -242,23 +239,28 @@ def main():
                         datetime.datetime.combine(day, stop),
                     ))
             subplot_list = (
-                (1, (x[1] for x in data.record_list), 'r.', 'V'),
-                (2, (x[2] for x in data.record_list), 'g.', 'A'),
-                (3, (x[3] for x in data.record_list), 'k.', 'cos($\\varphi$)'),
-                (4, (x[1] * x[2] * x[3] for x in data.record_list), 'c.', 'W'),
-                (5, (x[1] * x[2] for x in data.record_list), 'b.', 'VA'),
-                # XXX: numbers too small for graph
-                (6, price_list, 'y.', 'currency unit / minute'),
-                (7, running_price_list, 'y.', 'currency unit'),
+                ((x[1] for x in data.record_list), 'r.', 'V'),
+                ((x[2] for x in data.record_list), 'g.', 'A'),
+                ((x[3] for x in data.record_list), 'k.', 'cos($\\varphi$)'),
+                ((x[1] * x[2] * x[3] for x in data.record_list), 'c.', 'W'),
+                ((x[1] * x[2] for x in data.record_list), 'b.', 'VA'),
+                (price_list, 'y.', 'currency unit / minute'),
+                (running_price_list, 'y.', 'currency unit'),
             )
             subplot_per_sensor = len(subplot_list)
-            for plot, y, line, unit in subplot_list:
+            main_x = None
+            for plot, (y, line, unit) in enumerate(subplot_list, 1):
                 ax = plt.subplot(subplot_per_sensor, cols,
                     (sensor_id * subplot_per_sensor) + plot)
-                ax.xaxis.set_major_locator(all_days)
-                ax.xaxis.set_minor_locator(all_hours)
-                ax.xaxis.set_major_formatter(day_formatter)
-                plt.plot(date_list, list(y), line, markersize=2)
+                if main_x is None:
+                    main_x = ax
+                    ax.set_xmargin(0)
+                    ax.xaxis.set_major_locator(DayLocator())
+                    ax.xaxis.set_major_formatter(DateFormatter('%Y-%m-%d %H:%M'))
+                else:
+                    ax.sharex(main_x)
+                ax.grid(which='both')
+                plt.plot_date(date_list, list(y), line, markersize=2)
                 for start, stop in expanded_price1_range_list:
                     plt.axvspan(start, stop, facecolor='y', alpha=0.5)
                 plt.ylabel(unit)
